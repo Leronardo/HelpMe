@@ -1,0 +1,58 @@
+/* Tela do funcionário: formulário de chamado e histórico em bilhetes */
+.topo { background: var(--ink); color: #fff; }
+.topo-in { max-width: 1120px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; gap: 14px; }
+.topo img { width: 44px; height: 44px; object-fit: contain; background: #fff; border-radius: 10px; padding: 3px; }
+.topo .tit { font-family: var(--font-display); font-weight: 800; font-size: 20px; line-height: 1.1; }
+.topo .tit small { display: block; font-family: var(--font-body); font-weight: 400; font-size: 13px; color: #9FB0C4; }
+.topo .dir { margin-left: auto; display: flex; align-items: center; gap: 12px; font-size: 14px; color: #B9C6D6; }
+.topo .dir button { background: none; border: 1px solid #3A4D66; color: #E8EEF5; border-radius: 8px; padding: 5px 12px; }
+.topo .dir button:hover { background: #1F3350; }
+.func { max-width: 1120px; margin: 0 auto; padding: 32px 24px 56px; display: grid; grid-template-columns: 400px 1fr; gap: 32px; align-items: start; }
+.novo { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 24px; position: sticky; top: 20px; }
+.novo h2 { font-size: 24px; margin-bottom: 18px; }
+.niveis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border: 0; padding: 0; margin: 0 0 6px; }
+.niveis legend { font-weight: 600; font-size: 13.5px; padding: 0; margin-bottom: 6px; }
+.niveis label { position: relative; }
+.niveis input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+.niveis .op { display: block; border: 2px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.niveis .op b { display: block; }
+.niveis .op small { color: var(--muted); font-size: 12px; line-height: 1.3; display: block; }
+.niveis input:checked + .op { border-color: var(--c); background: var(--cb); }
+.niveis input:checked + .op b { color: var(--c); }
+.niveis input:focus-visible + .op { outline: 3px solid var(--focus); }
+.niveis .l-critico { --c: var(--n-critico); --cb: var(--n-critico-bg); }
+.niveis .l-alto { --c: var(--n-alto); --cb: var(--n-alto-bg); }
+.niveis .l-medio { --c: var(--n-medio); --cb: var(--n-medio-bg); }
+.niveis .l-leve { --c: var(--n-leve); --cb: var(--n-leve-bg); }
+.hist-h { display: flex; align-items: baseline; gap: 12px; margin-bottom: 16px; }
+.hist-h h2 { font-size: 24px; }
+
+/* Chamado como bilhete: canhoto colorido pelo nível + picote */
+.tickets { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.ticket { --c: var(--n-leve); display: grid; grid-template-columns: 96px 1fr auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; position: relative; }
+.ticket.n-critico { --c: var(--n-critico); }
+.ticket.n-alto { --c: var(--n-alto); }
+.ticket.n-medio { --c: var(--n-medio); }
+.ticket.n-leve { --c: var(--n-leve); }
+.stub { background: var(--c); color: #fff; border-radius: 11px 0 0 11px; padding: 14px 10px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: 2px; border-right: 2px dashed rgba(255,255,255,.65); }
+.stub .num { font-family: var(--font-display); font-weight: 800; font-size: 22px; }
+.stub .lvl { font-size: 12.5px; font-weight: 700; }
+.ticket::before, .ticket::after { content: ''; position: absolute; left: 85px; width: 22px; height: 22px; border-radius: 50%; background: var(--paper); border: 1px solid var(--line); }
+.ticket::before { top: -12px; clip-path: inset(50% 0 0 0); }
+.ticket::after { bottom: -12px; clip-path: inset(0 0 50% 0); }
+.tbody { padding: 14px 16px; min-width: 0; }
+.tbody h3 { font-size: 18px; margin-bottom: 4px; overflow-wrap: anywhere; }
+.tbody p { margin: 0 0 8px; color: #3A4756; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tbody .meta { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.ticket > .badge { align-self: start; margin: 14px 14px 0 0; }
+
+/* Seletor de empresa no topo */
+.topo .tit select { background: #1A2B42; border: 1px solid #3A4D66; color: #fff; padding: 5px 10px; font-family: var(--font-display); font-weight: 800; font-size: 18px; width: auto; max-width: 260px; }
+.topo .tit small { display: block; margin-top: 2px; }
+.topo-in { flex-wrap: wrap; }
+.topo .dir { flex-wrap: wrap; }
+
+/* Ajuda do funcionário */
+.func-tut { max-width: 820px; margin: 0 auto; padding: 32px 24px 56px; }
+.func-tut h2 { font-size: 28px; margin-bottom: 4px; }
+.func-tut > p.muted { margin: 0 0 22px; }

@@ -1,0 +1,9 @@
+/* Passo a passo do tutorial */
+.passos { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; max-width: 820px; }
+.passo { display: grid; grid-template-columns: 44px 1fr; gap: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
+.passo .n { width: 40px; height: 40px; border-radius: 50%; background: var(--beacon); color: var(--ink); font-family: var(--font-display); font-weight: 800; font-size: 20px; display: grid; place-items: center; }
+.passo h3 { font-size: 19px; margin-bottom: 4px; }
+.passo p { margin: 0; color: #3A4756; }
+.legenda { display: grid; gap: 8px; margin-top: 12px; }
+.legenda div { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.legenda .badge { min-width: 84px; text-align: center; }

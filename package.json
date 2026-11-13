@@ -1,0 +1,14 @@
+{
+  "name": "helpme",
+  "version": "1.0.0",
+  "description": "HelpMe - sistema de chamados (administrador e funcionário) com SQL Server",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js"
+  },
+  "dependencies": {
+    "mssql": "^11.0.1"
+  },
+  "engines": { "node": ">=20.0.0" },
+  "license": "MIT"
+}

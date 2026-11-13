@@ -1,0 +1,10 @@
+/* Páginas abertas sem login (planos, tutorial) e escolha de plano */
+.pub { min-height: 100vh; }
+.pub-topo { background: var(--ink); color: #fff; }
+.pub-topo-in { max-width: 1120px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; gap: 12px; }
+.marca-txt { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 800; font-size: 24px; }
+.acoes-topo { margin-left: auto; display: flex; gap: 10px; flex-wrap: wrap; }
+.pub-main { max-width: 1120px; margin: 0 auto; padding: 48px 24px 72px; }
+.pub-main h1 { font-size: clamp(32px, 5vw, 48px); margin-bottom: 10px; }
+.pub-main .lead { color: var(--muted); font-size: 18px; max-width: 62ch; margin: 0 0 32px; }
+.seg-tut { max-width: 380px; margin-bottom: 24px; }

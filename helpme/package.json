@@ -1,0 +1,11 @@
+{
+  "name": "helpme",
+  "version": "1.0.0",
+  "description": "HelpMe - sistema de chamados (administrador e funcionário)",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning backend/server.js"
+  },
+  "engines": { "node": ">=22.13.0" },
+  "license": "MIT"
+}

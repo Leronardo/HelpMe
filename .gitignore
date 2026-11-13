@@ -1,0 +1,4 @@
+# segredo gerado automaticamente e dependências
+backend/data/
+node_modules/
+.env
