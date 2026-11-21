@@ -1,3 +1,4 @@
+// Planos e assinatura do administrador
 const { PLANOS, PLANO_PERSONALIZADO, buscarPlano, montarPersonalizado } = require('../config/planos');
 const empresaModel = require('../models/empresaModel');
 const usuarioModel = require('../models/usuarioModel');
@@ -6,6 +7,7 @@ const pagamento = require('../services/pagamento');
 const { HttpError } = require('../utils/erros');
 const { usuarioPublico, planoDoUsuario } = require('../utils/apresentacao');
 
+// Lista pública: a tela de preços aparece antes mesmo do login
 function listar() {
   const { id, nome, minimo, maximo, precoPorEmpresa } = PLANO_PERSONALIZADO;
   return {
@@ -15,6 +17,7 @@ function listar() {
   };
 }
 
+// Descobre qual plano o administrador pediu. No personalizado ele também informa a quantidade de empresas.
 function resolverPlano(body) {
   if (body.plano_id === PLANO_PERSONALIZADO.id) {
     const empresas = Number(body.empresas);
@@ -29,16 +32,20 @@ function resolverPlano(body) {
   return plano;
 }
 
+// function assinar({ req, body }) {
 async function assinar({ req, body }) {
+  // const admin = exigeLogin(req, 'administrador');
   const admin = await exigeLogin(req, 'administrador');
   const plano = resolverPlano(body);
 
- const empresas = await empresaModel.contarDoAdmin(admin.id);
+  // não deixa ir para um plano menor do que a quantidade de empresas que já existe
+  //const empresas = empresaModel.contarDoAdmin(admin.id);
+  const empresas = await empresaModel.contarDoAdmin(admin.id);
   if (empresas > plano.empresas) {
     throw new HttpError(400, `Você tem ${empresas} empresas e o plano ${plano.nome} permite só ${plano.empresas}. Escolha um plano maior.`);
   }
 
-  pagamento.cobrarAssinatura(admin, plano); 
+  pagamento.cobrarAssinatura(admin, plano); // lança erro se o pagamento não for aprovado
   await usuarioModel.definirPlano(admin.id, plano.id, plano.personalizado ? plano.empresas : null);
 
   const atualizado = await usuarioModel.buscarPorId(admin.id);

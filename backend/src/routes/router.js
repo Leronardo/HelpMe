@@ -1,5 +1,7 @@
+// Mini roteador: guarda as rotas e descobre qual atende a requisição
 const rotas = [];
 
+// Exemplo de caminho: '/api/empresas/:id/chamados'  (":id" vira params.id)
 function adicionar(metodo, caminho, handler) {
   const nomes = [];
   const regex = new RegExp('^' + caminho.replace(/:([a-z]+)/g, (_, nome) => {
@@ -9,6 +11,7 @@ function adicionar(metodo, caminho, handler) {
   rotas.push({ metodo, regex, nomes, handler });
 }
 
+// Retorna { handler, params } ou null se nenhuma rota combinar
 function encontrar(metodo, caminho) {
   for (const rota of rotas) {
     if (rota.metodo !== metodo) continue;

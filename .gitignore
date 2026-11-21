@@ -1,4 +1,6 @@
-# segredo gerado automaticamente e dependências
+# banco de dados e segredo gerados automaticamente
+#backend/data/
+#node_modules/
 backend/data/
 node_modules/
 .env
