@@ -1,3 +1,4 @@
+// Criptografia de senha com scrypt (nunca guardamos a senha pura no banco)
 const crypto = require('node:crypto');
 
 function gerarHash(senha) {

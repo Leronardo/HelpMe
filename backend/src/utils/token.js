@@ -1,3 +1,4 @@
+// Token de login assinado (parecido com um JWT simples): "dados.assinatura"
 const crypto = require('node:crypto');
 const { SEGREDO } = require('../config/env');
 
@@ -9,6 +10,7 @@ function assinar(usuarioId) {
   return `${dados}.${assinatura}`;
 }
 
+// Retorna { uid, exp } se o token for válido, senão null
 function verificar(token) {
   const [dados, assinatura] = String(token || '').split('.');
   if (!dados || !assinatura) return null;

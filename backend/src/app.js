@@ -50,6 +50,7 @@ async function app(req, res) {
     const body = corpoPermitido ? await lerCorpo(req) : {};
     const query = Object.fromEntries(url.searchParams);
 
+    //const resultado = rota.handler({ req, params: rota.params, body, query });
     const resultado = await rota.handler({ req, params: rota.params, body, query });
     // Os controllers retornam o objeto direto (200) ou { status, data } (ex.: 201)
     if (resultado && resultado.status) return responderJson(res, resultado.status, resultado.data);
