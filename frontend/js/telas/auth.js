@@ -105,7 +105,8 @@ export function telaAuth(preservar = false) {
 function telaEntrarOuCriar(preservar) {
   const dados = preparar(preservar);
   const criar = estado.auth.modo === 'criar';
-  const campos = (criar ? campoHtml('nome', 'Seu nome', 'text', `autocomplete="name" ${valor(dados, 'nome')}`) : '')
+  //const campos = (criar ? campoHtml('nome', 'Seu nome', 'text', `autocomplete="name" ${valor(dados, 'nome')}`) : '')
+    const campos = (criar ? campoHtml('nome', 'Seu nome', 'text', `autocomplete="name" maxlength="80" oninput="this.value=this.value.normalize('NFC').replace(/[^\\p{L} ]/gu,'')" ${valor(dados, 'nome')}`) : '')
     + campoHtml('email', 'E-mail', 'email', `autocomplete="email" ${valor(dados, 'email')}`)
     + campoSenha('Senha', 'senha', 'senha', `${valor(dados, 'senha')} autocomplete="${criar ? 'new-password' : 'current-password'}`)
     + (criar ? regrasHtml : '');
