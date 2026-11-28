@@ -1,0 +1,145 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Usuario {
+  id            Int      @id @default(autoincrement())
+  nome          String
+  email         String   @unique
+  senhaHash     String   @map("senha_hash")
+  perfil        String
+  planoId       String?  @map("plano_id")
+  planoEmpresas Int?     @map("plano_empresas")
+  trocarSenha   Boolean  @default(false) @map("trocar_senha")
+  senhaVersao   Int      @default(0) @map("senha_versao")
+  criadoEm      DateTime @map("criado_em")
+
+  empresas Empresa[]
+  vinculos Vinculo[]
+  chamados Chamado[] @relation("AbertoPor")
+  responsabilidades Chamado[] @relation("Responsavel")
+  observacoes Observacao[]
+  pagamentos Pagamento[]
+
+  @@map("usuarios")
+}
+
+model Empresa {
+  id       Int      @id @default(autoincrement())
+  nome     String
+  logo     String
+  codigo   String   @unique
+  adminId  Int      @map("admin_id")
+  criadoEm DateTime @map("criado_em")
+
+  admin    Usuario   @relation(fields: [adminId], references: [id])
+  vinculos Vinculo[]
+  setores  Setor[]
+  chamados Chamado[]
+
+  @@index([adminId])
+  @@map("empresas")
+}
+
+model Vinculo {
+  usuarioId Int      @map("usuario_id")
+  empresaId Int      @map("empresa_id")
+  criadoEm  DateTime @map("criado_em")
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@id([usuarioId, empresaId])
+  @@index([empresaId])
+  @@map("vinculos")
+}
+
+model Setor {
+  id        Int    @id @default(autoincrement())
+  empresaId Int    @map("empresa_id")
+  nome      String
+  nomeNorm  String @map("nome_norm")
+
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+
+  @@unique([empresaId, nomeNorm])
+  @@map("setores")
+}
+
+model Chamado {
+  id           Int      @id @default(autoincrement())
+  empresaId    Int      @map("empresa_id")
+  usuarioId    Int      @map("usuario_id")
+  titulo       String
+  descricao    String   @default("")
+  setor        String
+  nivel        String
+  status       String   @default("aberto")
+  responsavelId Int?    @map("responsavel_id")
+  criadoEm     DateTime @map("criado_em")
+  atualizadoEm DateTime @map("atualizado_em")
+
+  empresa Empresa @relation(fields: [empresaId], references: [id], onDelete: Cascade)
+  usuario Usuario @relation("AbertoPor", fields: [usuarioId], references: [id], onDelete: Cascade)
+  responsavel Usuario? @relation("Responsavel", fields: [responsavelId], references: [id], onDelete: SetNull)
+  observacoes Observacao[]
+
+  @@index([empresaId, criadoEm])
+  @@index([usuarioId])
+  @@index([responsavelId])
+  @@map("chamados")
+}
+
+model Observacao {
+  id        Int      @id @default(autoincrement())
+  chamadoId Int      @map("chamado_id")
+  autorId   Int?     @map("autor_id")
+  autorNome String   @map("autor_nome")
+  texto     String
+  criadoEm  DateTime @map("criado_em")
+
+  chamado Chamado  @relation(fields: [chamadoId], references: [id], onDelete: Cascade)
+  autor   Usuario? @relation(fields: [autorId], references: [id], onDelete: SetNull)
+
+  @@index([chamadoId])
+  @@map("observacoes")
+}
+
+model CodigoEmail {
+  id         Int       @id @default(autoincrement())
+  email      String
+  tipo       String
+  codigoHash String    @map("codigo_hash")
+  nome       String    @default("")
+  senhaHash  String    @default("") @map("senha_hash")
+  expiraEm   DateTime  @map("expira_em")
+  tentativas Int       @default(0)
+  usadoEm    DateTime? @map("usado_em")
+  criadoEm   DateTime  @map("criado_em")
+
+  @@index([email, tipo, criadoEm])
+  @@map("codigos_email")
+}
+
+model Pagamento {
+  id        Int      @id @default(autoincrement())
+  usuarioId Int      @map("usuario_id")
+  planoId   String   @map("plano_id")
+  empresas  Int?
+  valor     Int
+  metodo    String
+  mpId      String?  @map("mp_id")
+  status    String   @default("pendente")
+  criadoEm  DateTime @map("criado_em")
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([usuarioId])
+  @@map("pagamentos")
+}

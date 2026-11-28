@@ -1,45 +1,42 @@
-// Telas de criação de empresa e do código gerado (administrador)
 import { api } from '../api.js';
 import { estado } from '../estado.js';
 import { rotear } from '../navegacao.js';
 import { selecionarEmpresa, sair } from '../sessao.js';
-import { $, esc, copiar, lerLogo } from '../utils.js';
+import { $, esc, copiar } from '../utils.js';
+import { ligarLogo } from '../logoEscolha.js';
+import { campoHtml, classesBotao, erroCls, htmlLogo, htmlLogosProntos, logoCaixa, muted } from '../ui.js';
+
+const centro = 'grid min-h-screen place-items-center p-6';
+const painel = 'w-full max-w-[480px] rounded-[14px] border border-line bg-white p-8';
 
 export function telaEmpresaForm() {
   estado.logoTemp = null;
-  const podeCancelar = estado.empresas.length > 0; // quem já tem empresa pode voltar
+  const podeCancelar = estado.empresas.length > 0;
 
   $('#app').innerHTML = `
-    <div class="card-centro">
-      <form class="painel-form" id="f" novalidate>
-        <h2>${podeCancelar ? 'Nova empresa' : 'Cadastre sua empresa'}</h2>
-        <p class="sub">Informe o nome e o logotipo. Ao concluir, geramos o código para seus funcionários entrarem.</p>
-        <label class="campo"><span>Nome da empresa</span><input type="text" name="nome" maxlength="80" required></label>
-        <label class="logo-up">
-          <span class="ph" id="prev">+</span>
-          <span><strong>Logotipo da empresa</strong><span class="muted" id="logoTxt">Clique para escolher uma imagem</span></span>
-          <input type="file" id="logo" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml">
-        </label>
-        <p class="erro" id="erro" role="alert"></p>
-        <div class="acoes">
-          <button type="button" class="btn ghost" id="voltar">${podeCancelar ? 'Cancelar' : 'Sair'}</button>
-          <button class="btn" id="enviar">Criar empresa</button>
+    <div class="${centro}">
+      <form class="${painel}" id="f" novalidate>
+        <h2 class="mb-1.5 font-display text-[28px]">${podeCancelar ? 'Nova empresa' : 'Cadastre sua empresa'}</h2>
+        <p class="mb-[22px] ${muted}">Informe o nome e o logotipo. Anexe uma imagem ou escolha uma das opções prontas. Na aba Equipe você cria a conta de cada técnico.</p>
+        ${campoHtml('nome', 'Nome da empresa', 'text', 'maxlength="80"')}
+        ${htmlLogo({
+          preview: `<span class="${logoCaixa}" id="prev">+</span>`,
+          textoId: 'logoTxt',
+          texto: 'Anexe PNG, JPG, WEBP, GIF ou SVG',
+          rotulo: 'Logotipo da empresa',
+        })}
+        ${htmlLogosProntos()}
+        <p class="${erroCls}" id="erro" role="alert"></p>
+        <div class="flex gap-2.5">
+          <button type="button" class="${classesBotao({ ghost: true, block: true })}" id="voltar">${podeCancelar ? 'Cancelar' : 'Sair'}</button>
+          <button class="${classesBotao({ block: true })}" id="enviar">Criar empresa</button>
         </div>
       </form>
     </div>`;
+  window.scrollTo(0, 0);
+  if (window.matchMedia('(min-width: 961px)').matches) $('input[name=nome]')?.focus();
 
-  $('#logo').addEventListener('change', async (evento) => {
-    const arquivo = evento.target.files[0];
-    if (!arquivo) return;
-    try {
-      estado.logoTemp = await lerLogo(arquivo);
-      $('#prev').outerHTML = `<img id="prev" src="${estado.logoTemp}" alt="Prévia do logotipo">`;
-      $('#logoTxt').textContent = arquivo.name;
-      $('#erro').textContent = '';
-    } catch (e) {
-      $('#erro').textContent = e.message;
-    }
-  });
+  ligarLogo((src) => { estado.logoTemp = src; }, '#erro');
 
   $('#voltar').addEventListener('click', () => {
     if (podeCancelar) { estado.criandoEmpresa = false; rotear(); }
@@ -59,7 +56,7 @@ export function telaEmpresaForm() {
       estado.empresas.push(empresa);
       selecionarEmpresa(empresa.id);
       estado.criandoEmpresa = false;
-      estado.empresaNova = empresa; // faz a tela do código aparecer
+      estado.empresaNova = empresa;
       rotear();
     } catch (e) {
       erro.textContent = e.message;
@@ -72,18 +69,19 @@ export function telaEmpresaCriada() {
   const empresa = estado.empresaNova;
 
   $('#app').innerHTML = `
-    <div class="card-centro">
-      <div class="painel-form centro">
-        <img class="emp-big" src="${esc(empresa.logo)}" alt="">
-        <h2 style="margin-top:14px">${esc(empresa.nome)} está pronta</h2>
-        <p class="sub">Passe este código aos seus funcionários. Com ele, cada um cria a conta e já entra direto na empresa.</p>
-        <div class="codigo-grande" aria-label="Código da empresa">${esc(empresa.codigo)}</div>
-        <div class="acoes">
-          <button class="btn ghost" id="copiar">Copiar código</button>
-          <button class="btn" id="ir">Ir para o painel</button>
+    <div class="${centro}">
+      <div class="${painel} text-center">
+        <img class="mx-auto size-[84px] rounded-[14px] bg-[#F3F5F7] object-contain p-1.5" src="${esc(empresa.logo)}" alt="">
+        <h2 class="mt-3.5 mb-1.5 font-display text-[28px]">${esc(empresa.nome)} está pronta</h2>
+        <p class="mb-[22px] ${muted}">Agora crie a conta dos técnicos na aba Equipe. O técnico cadastra os colaboradores. O código abaixo serve para quem já tem conta no HelpMe entrar nesta empresa também.</p>
+        <div class="my-5 rounded-xl bg-ink px-2.5 py-[18px] text-center font-display text-[52px] font-extrabold tracking-[.12em] text-beacon" aria-label="Código da empresa">${esc(empresa.codigo)}</div>
+        <div class="flex gap-2.5">
+          <button class="${classesBotao({ ghost: true, block: true })}" id="copiar">Copiar código</button>
+          <button class="${classesBotao({ block: true })}" id="ir">Ir para o painel</button>
         </div>
       </div>
     </div>`;
+  window.scrollTo(0, 0);
 
   $('#copiar').addEventListener('click', () => copiar(empresa.codigo));
   $('#ir').addEventListener('click', () => {

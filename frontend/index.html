@@ -8,29 +8,92 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-  <link rel="stylesheet" href="css/base.css">
-  <link rel="stylesheet" href="css/auth.css">
-  <link rel="stylesheet" href="css/admin.css">
-  <link rel="stylesheet" href="css/funcionario.css">
-  <link rel="stylesheet" href="css/publico.css">
-  <link rel="stylesheet" href="css/planos.css">
-  <link rel="stylesheet" href="css/tutorial.css">
-  <link rel="stylesheet" href="css/recepcao.css">
-  <link rel="stylesheet" href="css/responsivo.css">
+  <script src="vendor/tailwind.js"></script>
+  <style type="text/tailwindcss">
+    @theme {
+      --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+      --font-sans: "Figtree", "Segoe UI", system-ui, sans-serif;
+      --color-ink: #0F1C2E;
+      --color-ink-2: #1A2B42;
+      --color-paper: #EDF0F3;
+      --color-line: #D5DBE2;
+      --color-muted: #5F6E7F;
+      --color-beacon: #FFB41F;
+      --color-danger: #B7313A;
+      --color-n-critico: #C93A3F;
+      --color-n-critico-bg: #FBE4E5;
+      --color-n-alto: #CC6A1E;
+      --color-n-alto-bg: #FCEBDD;
+      --color-n-medio: #2F6FA8;
+      --color-n-medio-bg: #E1EDF7;
+      --color-n-leve: #2E8A66;
+      --color-n-leve-bg: #DDF2E9;
+      --color-s-aberto: #4A5A6C;
+      --color-s-aberto-bg: #E4E9EE;
+      --color-s-analise: #6A4FC0;
+      --color-s-analise-bg: #ECE7FA;
+      --color-s-recurso: #8A5A12;
+      --color-s-recurso-bg: #F8EBD4;
+      --color-s-ok: #2E8A66;
+      --color-s-ok-bg: #DDF2E9;
+    }
+    h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.01em; line-height: 1.15; }
+    :focus-visible { outline: 3px solid var(--color-beacon); outline-offset: 2px; }
+    @keyframes entra { from { opacity: 0; transform: translateY(8px); } }
+    @keyframes surge { from { opacity: 0; } }
+    #app > * { animation: entra .32s ease both; }
+    #main > * { animation: entra .24s ease both; }
+    #hist > li { animation: entra .3s ease both; }
+    #hist > li:nth-child(2) { animation-delay: .04s; }
+    #hist > li:nth-child(3) { animation-delay: .08s; }
+    #hist > li:nth-child(4) { animation-delay: .12s; }
+    #hist > li:nth-child(5) { animation-delay: .16s; }
+    #hist > li:nth-child(n + 6) { animation-delay: .2s; }
+    dialog { margin: auto; }
+    button[data-logo][aria-pressed="true"] { border-color: var(--color-ink); box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--color-beacon); }
+    dialog[open] { animation: entra .22s ease; }
+    button, a, input, select, textarea, summary, label {
+      transition: background-color .18s ease, border-color .18s ease, color .18s ease, box-shadow .18s ease, transform .18s ease, opacity .18s ease;
+    }
+    .ticket:not(.ticket-hero) { transition: transform .2s ease, box-shadow .2s ease; }
+    .ticket:not(.ticket-hero):hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(15, 28, 46, .08); }
+    .cartao { transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
+    .cartao:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(15, 28, 46, .08); }
+    tbody tr { transition: background-color .18s ease; }
+    tbody tr:hover { background: #f7f9fb; }
+    .ticket::before, .ticket::after {
+      content: "";
+      position: absolute;
+      left: 85px;
+      width: 22px;
+      height: 22px;
+      border-radius: 9999px;
+      background: var(--color-paper);
+      border: 1px solid var(--color-line);
+      pointer-events: none;
+    }
+    .ticket::before { top: -12px; clip-path: inset(50% 0 0 0); }
+    .ticket::after { bottom: -12px; clip-path: inset(0 0 50% 0); }
+    .ticket-hero::before, .ticket-hero::after { background: var(--color-ink); border-color: var(--color-ink); }
+    @media (max-width: 520px) {
+      .ticket::before, .ticket::after { left: 61px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+  </style>
 </head>
-<body>
+<body class="bg-paper font-sans text-[15px] leading-normal text-[#17222F]">
   <div id="app"></div>
-  <div id="toasts" aria-live="polite"></div>
+  <div id="toasts" class="fixed right-4 bottom-4 z-50 grid gap-2" aria-live="polite"></div>
 
-  <!-- Janela de confirmação (usada ao excluir usuário) -->
-  <dialog id="dlg">
+  <dialog id="dlg" class="m-auto w-[calc(100%-2rem)] max-w-[420px] rounded-[14px] border-0 p-6 shadow-[0_20px_60px_rgba(15,28,46,.35)] backdrop:bg-ink/55">
     <form method="dialog">
-      <h3 id="dlg-titulo"></h3>
-      <p id="dlg-msg"></p>
-      <div class="dlg-acoes">
-        <button value="cancelar" class="btn ghost">Cancelar</button>
-        <button value="ok" class="btn danger" id="dlg-ok">Confirmar</button>
+      <h3 id="dlg-titulo" class="mb-2 font-display text-[22px]"></h3>
+      <p id="dlg-msg" class="mb-5 text-[#3A4756]"></p>
+      <div class="flex justify-end gap-2.5">
+        <button value="cancelar" class="inline-flex cursor-pointer items-center justify-center rounded-lg border border-line bg-transparent px-[18px] py-2.5 font-semibold hover:bg-[#E3E8ED]" id="dlg-cancelar">Cancelar</button>
+        <button value="ok" class="inline-flex cursor-pointer items-center justify-center rounded-lg border border-transparent bg-danger px-[18px] py-2.5 font-semibold text-white hover:bg-[#9C2830]" id="dlg-ok">Confirmar</button>
       </div>
     </form>
   </dialog>

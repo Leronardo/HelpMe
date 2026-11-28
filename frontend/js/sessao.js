@@ -1,4 +1,3 @@
-// Login, logout e carregamento dos dados de quem está logado
 import { api } from './api.js';
 import { estado } from './estado.js';
 import { rotear } from './navegacao.js';
@@ -17,7 +16,6 @@ export async function carregarMe() {
   estado.plano = dados.plano ?? null;
   estado.empresas = dados.empresas;
 
-  // se a empresa salva não existe mais (ou é de outra conta), usa a primeira
   if (!estado.empresas.some((e) => e.id === estado.empresaId)) {
     estado.empresaId = estado.empresas[0]?.id ?? null;
   }
@@ -30,11 +28,16 @@ export async function iniciarSessao(dados) {
   rotear();
 }
 
-export function sair() {
+export function sair(aviso = '', email = '') {
+  if (typeof aviso !== 'string') aviso = '';
+  if (typeof email !== 'string') email = '';
   localStorage.removeItem('helpme_token');
   Object.assign(estado, {
     token: null, usuario: null, plano: null, empresas: [], empresaNova: null, criandoEmpresa: false,
-    escolhendoPlano: false, avisoPlano: '', abaAdmin: 'chamados', funcVista: 'chamados', publico: null,
+    escolhendoPlano: false, avisoPlano: '', abaAdmin: 'chamados', funcVista: 'chamados',
+    avisoAuth: aviso,
+    emailLembrado: email,
+    auth: { modo: 'entrar' },
   });
   rotear();
 }

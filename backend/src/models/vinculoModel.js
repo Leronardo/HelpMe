@@ -1,74 +1,60 @@
-// // Consultas SQL da tabela "vinculos" (funcionário <-> empresa)
-// const db = require('../config/database');
+const { prisma } = require('../config/prisma');
 
-// const existe = (usuarioId, empresaId) =>
-//   !!db.prepare('SELECT 1 FROM vinculos WHERE usuario_id = ? AND empresa_id = ?').get(usuarioId, empresaId);
-
-// const criar = (usuarioId, empresaId) =>
-//   db.prepare('INSERT INTO vinculos (usuario_id, empresa_id, criado_em) VALUES (?, ?, ?)')
-//     .run(usuarioId, empresaId, new Date().toISOString());
-
-// const listarFuncionariosDaEmpresa = (empresaId) =>
-//   db.prepare(`
-//     SELECT u.id, u.nome, u.email, v.criado_em,
-//            (SELECT COUNT(*) FROM chamados c WHERE c.usuario_id = u.id AND c.empresa_id = v.empresa_id) AS chamados
-//     FROM vinculos v
-//     JOIN usuarios u ON u.id = v.usuario_id
-//     WHERE v.empresa_id = ?
-//     ORDER BY u.nome COLLATE NOCASE`).all(empresaId);
-
-// // Tira o funcionário da empresa e apaga os chamados dele nela.
-// // Se ele não trabalhar em mais nenhuma empresa, a conta também é apagada.
-// // Retorna 1 se removeu, 0 se ele não fazia parte da empresa.
-// function removerFuncionario(usuarioId, empresaId) {
-//   if (!existe(usuarioId, empresaId)) return 0;
-
-//   db.exec('BEGIN');
-//   try {
-//     db.prepare('DELETE FROM chamados WHERE usuario_id = ? AND empresa_id = ?').run(usuarioId, empresaId);
-//     db.prepare('DELETE FROM vinculos WHERE usuario_id = ? AND empresa_id = ?').run(usuarioId, empresaId);
-//     const restantes = db.prepare('SELECT COUNT(*) AS n FROM vinculos WHERE usuario_id = ?').get(usuarioId).n;
-//     if (restantes === 0) db.prepare("DELETE FROM usuarios WHERE id = ? AND perfil = 'funcionario'").run(usuarioId);
-//     db.exec('COMMIT');
-//   } catch (erro) {
-//     db.exec('ROLLBACK');
-//     throw erro;
-//   }
-//   return 1;
-// }
-
-// module.exports = { existe, criar, listarFuncionariosDaEmpresa, removerFuncionario };
-
-// Consultas SQL da tabela "vinculos" (funcionário <-> empresa)
-const bd = require('../config/database');
+const iso = (data) => (data instanceof Date ? data.toISOString() : data);
 
 const existe = async (usuarioId, empresaId) =>
-  !!(await bd.um('SELECT 1 AS ok FROM vinculos WHERE usuario_id = ? AND empresa_id = ?', [usuarioId, empresaId]));
+  !!(await prisma.vinculo.findUnique({
+    where: { usuarioId_empresaId: { usuarioId, empresaId } },
+    select: { usuarioId: true },
+  }));
 
 const criar = (usuarioId, empresaId) =>
-  bd.executar('INSERT INTO vinculos (usuario_id, empresa_id, criado_em) VALUES (?, ?, ?)',
-    [usuarioId, empresaId, new Date().toISOString()]);
+  prisma.vinculo.create({ data: { usuarioId, empresaId, criadoEm: new Date() } });
 
-const listarFuncionariosDaEmpresa = (empresaId) =>
-  bd.consultar(`
-    SELECT u.id, u.nome, u.email, v.criado_em,
-           (SELECT COUNT(*) FROM chamados c WHERE c.usuario_id = u.id AND c.empresa_id = v.empresa_id) AS chamados
-    FROM vinculos v
-    JOIN usuarios u ON u.id = v.usuario_id
-    WHERE v.empresa_id = ?
-    ORDER BY u.nome`, [empresaId]);
+async function listarFuncionariosDaEmpresa(empresaId) {
+  const vinculos = await prisma.vinculo.findMany({
+    where: { empresaId },
+    include: {
+      usuario: {
+        include: {
+          _count: {
+            select: {
+              chamados: { where: { empresaId } },
+              responsabilidades: { where: { empresaId } },
+            },
+          },
+        },
+      },
+    },
+  });
 
-// Tira o funcionário da empresa e apaga os chamados dele nela.
-// Se ele não trabalhar em mais nenhuma empresa, a conta também é apagada.
-// Retorna 1 se removeu, 0 se ele não fazia parte da empresa.
+  return vinculos
+    .map((v) => ({
+      id: v.usuario.id,
+      nome: v.usuario.nome,
+      email: v.usuario.email,
+      perfil: v.usuario.perfil,
+      criado_em: iso(v.criadoEm),
+      chamados: v.usuario.perfil === 'tecnico'
+        ? v.usuario._count.responsabilidades
+        : v.usuario._count.chamados,
+    }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt'));
+}
+
 async function removerFuncionario(usuarioId, empresaId) {
   if (!(await existe(usuarioId, empresaId))) return 0;
 
-  await bd.transacao(async (tx) => {
-    await tx.executar('DELETE FROM chamados WHERE usuario_id = ? AND empresa_id = ?', [usuarioId, empresaId]);
-    await tx.executar('DELETE FROM vinculos WHERE usuario_id = ? AND empresa_id = ?', [usuarioId, empresaId]);
-    const { n } = await tx.um('SELECT COUNT(*) AS n FROM vinculos WHERE usuario_id = ?', [usuarioId]);
-    if (n === 0) await tx.executar("DELETE FROM usuarios WHERE id = ? AND perfil = 'funcionario'", [usuarioId]);
+  await prisma.$transaction(async (tx) => {
+    await tx.chamado.updateMany({ where: { responsavelId: usuarioId, empresaId }, data: { responsavelId: null } });
+    await tx.chamado.deleteMany({ where: { usuarioId, empresaId } });
+    await tx.vinculo.delete({ where: { usuarioId_empresaId: { usuarioId, empresaId } } });
+    const restantes = await tx.vinculo.count({ where: { usuarioId } });
+    if (restantes === 0) {
+      await tx.chamado.updateMany({ where: { responsavelId: usuarioId }, data: { responsavelId: null } });
+      await tx.observacao.updateMany({ where: { autorId: usuarioId }, data: { autorId: null } });
+      await tx.usuario.deleteMany({ where: { id: usuarioId, perfil: { in: ['funcionario', 'tecnico'] } } });
+    }
   });
   return 1;
 }
