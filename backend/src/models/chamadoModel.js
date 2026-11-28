@@ -1,105 +1,111 @@
-// // Consultas SQL da tabela "chamados"
-// const db = require('../config/database');
+const { prisma } = require('../config/prisma');
 
-// const buscarPorId = (id) => db.prepare('SELECT * FROM chamados WHERE id = ?').get(id);
+const iso = (data) => (data instanceof Date ? data.toISOString() : data);
 
-// function criar({ empresaId, usuarioId, titulo, descricao, setor, nivel }) {
-//   const agora = new Date().toISOString();
-//   const r = db.prepare(`
-//     INSERT INTO chamados (empresa_id, usuario_id, titulo, descricao, setor, nivel, status, criado_em, atualizado_em)
-//     VALUES (?, ?, ?, ?, ?, ?, 'aberto', ?, ?)`).run(empresaId, usuarioId, titulo, descricao, setor, nivel, agora, agora);
-//   return db.prepare('SELECT id, titulo, descricao, setor, nivel, status, criado_em, atualizado_em FROM chamados WHERE id = ?')
-//     .get(Number(r.lastInsertRowid));
-// }
-
-// // Chamados que o funcionário abriu em uma empresa específica
-// const listarDoUsuario = (usuarioId, empresaId) =>
-//   db.prepare(`SELECT id, titulo, descricao, setor, nivel, status, criado_em, atualizado_em
-//               FROM chamados WHERE usuario_id = ? AND empresa_id = ? ORDER BY criado_em DESC, id DESC`).all(usuarioId, empresaId);
-
-// // filtros: { nivel, status, setor, busca } (todos opcionais)
-// function listarDaEmpresa(empresaId, filtros) {
-//   const condicoes = ['c.empresa_id = ?'];
-//   const valores = [empresaId];
-
-//   if (filtros.nivel) { condicoes.push('c.nivel = ?'); valores.push(filtros.nivel); }
-//   if (filtros.status) { condicoes.push('c.status = ?'); valores.push(filtros.status); }
-//   if (filtros.setor) { condicoes.push('c.setor = ?'); valores.push(filtros.setor); }
-//   if (filtros.busca) {
-//     // escapa os caracteres especiais do LIKE (% _ \)
-//     const termo = `%${filtros.busca.replace(/[\\%_]/g, '\\$&')}%`;
-//     condicoes.push("(c.titulo LIKE ? ESCAPE '\\' OR u.nome LIKE ? ESCAPE '\\')");
-//     valores.push(termo, termo);
-//   }
-
-//   return db.prepare(`
-//     SELECT c.id, c.titulo, c.descricao, c.setor, c.nivel, c.status, c.criado_em, c.atualizado_em,
-//            u.nome AS usuario_nome, u.email AS usuario_email
-//     FROM chamados c
-//     JOIN usuarios u ON u.id = c.usuario_id
-//     WHERE ${condicoes.join(' AND ')}
-//     ORDER BY c.criado_em DESC, c.id DESC`).all(...valores);
-// }
-
-// const atualizarStatus = (id, status) =>
-//   db.prepare('UPDATE chamados SET status = ?, atualizado_em = ? WHERE id = ?').run(status, new Date().toISOString(), id);
-
-// const listarParaEstatisticas = (empresaId) =>
-//   db.prepare('SELECT nivel, status, criado_em FROM chamados WHERE empresa_id = ?').all(empresaId);
-
-// module.exports = { buscarPorId, criar, listarDoUsuario, listarDaEmpresa, atualizarStatus, listarParaEstatisticas };
-
-// Consultas SQL da tabela "chamados"
-const bd = require('../config/database');
-
-const COLUNAS = 'id, titulo, descricao, setor, nivel, status, criado_em, atualizado_em';
-
-const buscarPorId = (id) => bd.um('SELECT * FROM chamados WHERE id = ?', [id]);
-
-async function criar({ empresaId, usuarioId, titulo, descricao, setor, nivel }) {
-  const agora = new Date().toISOString();
-  const novo = await bd.um(
-    `INSERT INTO chamados (empresa_id, usuario_id, titulo, descricao, setor, nivel, status, criado_em, atualizado_em)
-     OUTPUT INSERTED.id
-     VALUES (?, ?, ?, ?, ?, ?, 'aberto', ?, ?)`,
-    [empresaId, usuarioId, titulo, descricao, setor, nivel, agora, agora],
-  );
-  return bd.um(`SELECT ${COLUNAS} FROM chamados WHERE id = ?`, [novo.id]);
+function observacoesDe(lista) {
+  return (lista || []).map((o) => ({
+    id: o.id,
+    texto: o.texto,
+    autor_nome: o.autorNome,
+    criado_em: iso(o.criadoEm),
+  }));
 }
 
-// Chamados que o funcionário abriu em uma empresa específica
-const listarDoUsuario = (usuarioId, empresaId) =>
-  bd.consultar(`SELECT ${COLUNAS} FROM chamados WHERE usuario_id = ? AND empresa_id = ? ORDER BY criado_em DESC, id DESC`,
-    [usuarioId, empresaId]);
+function linha(c, completo = false) {
+  const base = {
+    id: c.id,
+    titulo: c.titulo,
+    descricao: c.descricao,
+    setor: c.setor,
+    nivel: c.nivel,
+    status: c.status,
+    responsavel_id: c.responsavelId ?? null,
+    responsavel_nome: c.responsavel?.nome || '',
+    observacoes: observacoesDe(c.observacoes),
+    criado_em: iso(c.criadoEm),
+    atualizado_em: iso(c.atualizadoEm),
+  };
+  if (!completo) return base;
+  return { ...base, empresa_id: c.empresaId, usuario_id: c.usuarioId };
+}
 
-// filtros: { nivel, status, setor, busca } (todos opcionais)
-function listarDaEmpresa(empresaId, filtros) {
-  const condicoes = ['c.empresa_id = ?'];
-  const valores = [empresaId];
+const incluirPessoas = {
+  responsavel: { select: { nome: true } },
+  observacoes: { orderBy: [{ criadoEm: 'asc' }, { id: 'asc' }] },
+};
 
-  if (filtros.nivel) { condicoes.push('c.nivel = ?'); valores.push(filtros.nivel); }
-  if (filtros.status) { condicoes.push('c.status = ?'); valores.push(filtros.status); }
-  if (filtros.setor) { condicoes.push('c.setor = ?'); valores.push(filtros.setor); }
+const buscarPorId = async (id) => {
+  const chamado = await prisma.chamado.findUnique({ where: { id }, include: incluirPessoas });
+  return chamado ? linha(chamado, true) : null;
+};
+
+async function criar({ empresaId, usuarioId, titulo, descricao, setor, nivel }) {
+  const agora = new Date();
+  const chamado = await prisma.chamado.create({
+    data: {
+      empresaId, usuarioId, titulo, descricao, setor, nivel,
+      status: 'aberto', criadoEm: agora, atualizadoEm: agora,
+    },
+  });
+  return linha(chamado);
+}
+
+const listarDoUsuario = async (usuarioId, empresaId) => {
+  const chamados = await prisma.chamado.findMany({
+    where: { usuarioId, empresaId },
+    orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
+    include: incluirPessoas,
+  });
+  return chamados.map((c) => linha(c));
+};
+
+async function listarDaEmpresa(empresaId, filtros) {
+  const where = { empresaId };
+  if (filtros.nivel) where.nivel = filtros.nivel;
+  if (filtros.status) where.status = filtros.status;
+  if (filtros.setor) where.setor = filtros.setor;
   if (filtros.busca) {
-    // escapa os caracteres especiais do LIKE no SQL Server: % _ [ e a própria barra \
-    const termo = `%${filtros.busca.replace(/[\\%_[]/g, '\\$&')}%`;
-    condicoes.push("(c.titulo LIKE ? ESCAPE '\\' OR u.nome LIKE ? ESCAPE '\\')");
-    valores.push(termo, termo);
+    where.OR = [
+      { titulo: { contains: filtros.busca } },
+      { usuario: { nome: { contains: filtros.busca } } },
+      { responsavel: { nome: { contains: filtros.busca } } },
+    ];
   }
 
-  return bd.consultar(`
-    SELECT c.id, c.titulo, c.descricao, c.setor, c.nivel, c.status, c.criado_em, c.atualizado_em,
-           u.nome AS usuario_nome, u.email AS usuario_email
-    FROM chamados c
-    JOIN usuarios u ON u.id = c.usuario_id
-    WHERE ${condicoes.join(' AND ')}
-    ORDER BY c.criado_em DESC, c.id DESC`, valores);
+  const chamados = await prisma.chamado.findMany({
+    where,
+    orderBy: [{ criadoEm: 'desc' }, { id: 'desc' }],
+    include: { usuario: { select: { nome: true, email: true } }, ...incluirPessoas },
+  });
+
+  return chamados.map((c) => ({
+    ...linha(c),
+    usuario_nome: c.usuario.nome,
+    usuario_email: c.usuario.email,
+  }));
 }
 
 const atualizarStatus = (id, status) =>
-  bd.executar('UPDATE chamados SET status = ?, atualizado_em = ? WHERE id = ?', [status, new Date().toISOString(), id]);
+  prisma.chamado.update({ where: { id }, data: { status, atualizadoEm: new Date() } });
 
-const listarParaEstatisticas = (empresaId) =>
-  bd.consultar('SELECT nivel, status, criado_em FROM chamados WHERE empresa_id = ?', [empresaId]);
+const definirResponsavel = (id, responsavelId) =>
+  prisma.chamado.update({ where: { id }, data: { responsavelId, atualizadoEm: new Date() } });
 
-module.exports = { buscarPorId, criar, listarDoUsuario, listarDaEmpresa, atualizarStatus, listarParaEstatisticas };
+async function comentar({ chamadoId, autorId, autorNome, texto }) {
+  const observacao = await prisma.observacao.create({
+    data: { chamadoId, autorId, autorNome, texto, criadoEm: new Date() },
+  });
+  return { id: observacao.id, texto: observacao.texto, autor_nome: observacao.autorNome, criado_em: iso(observacao.criadoEm) };
+}
+
+const listarParaEstatisticas = async (empresaId) => {
+  const chamados = await prisma.chamado.findMany({
+    where: { empresaId },
+    select: { nivel: true, status: true, criadoEm: true },
+  });
+  return chamados.map((c) => ({ nivel: c.nivel, status: c.status, criado_em: iso(c.criadoEm) }));
+};
+
+module.exports = {
+  buscarPorId, criar, listarDoUsuario, listarDaEmpresa, atualizarStatus, definirResponsavel, comentar, listarParaEstatisticas,
+};

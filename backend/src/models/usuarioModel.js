@@ -1,49 +1,44 @@
-// // Consultas SQL da tabela "usuarios"
-// const db = require('../config/database');
+const { prisma } = require('../config/prisma');
 
-// const buscarPorId = (id) => db.prepare('SELECT * FROM usuarios WHERE id = ?').get(id);
+const iso = (data) => (data instanceof Date ? data.toISOString() : data);
 
-// const buscarAdminPorEmail = (email) =>
-//   db.prepare("SELECT * FROM usuarios WHERE perfil = 'administrador' AND email = ?").get(email);
-
-// // Retorna uma lista (bancos antigos podem ter o mesmo e-mail em mais de uma conta)
-// const listarFuncionariosPorEmail = (email) =>
-//   db.prepare("SELECT * FROM usuarios WHERE perfil = 'funcionario' AND lower(email) = ?").all(email);
-
-// function criar({ nome, email, senhaHash, perfil }) {
-//   const r = db.prepare('INSERT INTO usuarios (nome, email, senha_hash, perfil, criado_em) VALUES (?, ?, ?, ?, ?)')
-//     .run(nome, email, senhaHash, perfil, new Date().toISOString());
-//   return buscarPorId(Number(r.lastInsertRowid));
-// }
-
-// // empresasPersonalizado só é usado no plano personalizado (nos outros fica null)
-// const definirPlano = (id, planoId, empresasPersonalizado = null) =>
-//   db.prepare('UPDATE usuarios SET plano_id = ?, plano_empresas = ? WHERE id = ?').run(planoId, empresasPersonalizado, id);
-
-// module.exports = { buscarPorId, buscarAdminPorEmail, listarFuncionariosPorEmail, criar, definirPlano };
-
-// Consultas SQL da tabela "usuarios"
-const bd = require('../config/database');
-
-const buscarPorId = (id) => bd.um('SELECT * FROM usuarios WHERE id = ?', [id]);
-
-const buscarAdminPorEmail = (email) =>
-  bd.um("SELECT * FROM usuarios WHERE perfil = 'administrador' AND email = ?", [email]);
-
-// Retorna uma lista (por segurança, caso exista mais de uma conta com o mesmo e-mail)
-const listarFuncionariosPorEmail = (email) =>
-  bd.consultar("SELECT * FROM usuarios WHERE perfil = 'funcionario' AND lower(email) = ?", [email]);
-
-async function criar({ nome, email, senhaHash, perfil }) {
-  const novo = await bd.um(
-    'INSERT INTO usuarios (nome, email, senha_hash, perfil, criado_em) OUTPUT INSERTED.id VALUES (?, ?, ?, ?, ?)',
-    [nome, email, senhaHash, perfil, new Date().toISOString()],
-  );
-  return buscarPorId(novo.id);
+function linha(u) {
+  if (!u) return null;
+  return {
+    id: u.id,
+    nome: u.nome,
+    email: u.email,
+    senha_hash: u.senhaHash,
+    perfil: u.perfil,
+    plano_id: u.planoId,
+    plano_empresas: u.planoEmpresas,
+    trocar_senha: u.trocarSenha ? 1 : 0,
+    senha_versao: u.senhaVersao || 0,
+    criado_em: iso(u.criadoEm),
+  };
 }
 
-// empresasPersonalizado só é usado no plano personalizado (nos outros fica null)
-const definirPlano = (id, planoId, empresasPersonalizado = null) =>
-  bd.executar('UPDATE usuarios SET plano_id = ?, plano_empresas = ? WHERE id = ?', [planoId, empresasPersonalizado, id]);
+const buscarPorId = async (id) => linha(await prisma.usuario.findUnique({ where: { id } }));
 
-module.exports = { buscarPorId, buscarAdminPorEmail, listarFuncionariosPorEmail, criar, definirPlano };
+const buscarPorEmail = async (email) => linha(await prisma.usuario.findUnique({ where: { email } }));
+
+async function criar({ nome, email, senhaHash, perfil, trocarSenha = false }) {
+  const criado = await prisma.usuario.create({
+    data: { nome, email, senhaHash, perfil, trocarSenha, criadoEm: new Date() },
+  });
+  return linha(criado);
+}
+
+const definirSenha = (id, senhaHash) =>
+  prisma.usuario.update({
+    where: { id },
+    data: { senhaHash, trocarSenha: false, senhaVersao: { increment: 1 } },
+  });
+
+const definirPlano = (id, planoId, empresasPersonalizado = null) =>
+  prisma.usuario.update({
+    where: { id },
+    data: { planoId, planoEmpresas: empresasPersonalizado },
+  });
+
+module.exports = { buscarPorId, buscarPorEmail, criar, definirSenha, definirPlano };

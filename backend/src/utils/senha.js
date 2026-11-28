@@ -1,4 +1,3 @@
-// Criptografia de senha com scrypt (nunca guardamos a senha pura no banco)
 const crypto = require('node:crypto');
 
 function gerarHash(senha) {
@@ -15,4 +14,17 @@ function conferir(senha, armazenado) {
   return hash.length === esperado.length && crypto.timingSafeEqual(hash, esperado);
 }
 
-module.exports = { gerarHash, conferir };
+function senhaAleatoria() {
+  const grupos = ['ABCDEFGHJKLMNPQRSTUVWXYZ', 'abcdefghijkmnopqrstuvwxyz', '23456789', '!@#$%'];
+  const todos = grupos.join('');
+  const escolher = (alfabeto) => alfabeto[crypto.randomInt(alfabeto.length)];
+  const chars = grupos.map(escolher);
+  while (chars.length < 12) chars.push(escolher(todos));
+  for (let i = chars.length - 1; i > 0; i -= 1) {
+    const j = crypto.randomInt(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join('');
+}
+
+module.exports = { gerarHash, conferir, senhaAleatoria };

@@ -1,4 +1,3 @@
-// Entrega os arquivos do frontend (HTML, CSS, JS, imagens)
 const fs = require('node:fs');
 const path = require('node:path');
 const { FRONTEND_DIR } = require('../config/env');
@@ -18,7 +17,6 @@ function servir(res, caminhoUrl) {
   if (relativo === '/') relativo = '/index.html';
 
   const arquivo = path.normalize(path.join(FRONTEND_DIR, relativo));
-  // impede acessar arquivos fora da pasta do frontend (ex.: /../backend)
   if (!arquivo.startsWith(FRONTEND_DIR)) {
     res.writeHead(403);
     return res.end();

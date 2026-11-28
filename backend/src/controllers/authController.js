@@ -1,186 +1,170 @@
-// // Cadastro e login de administradores e funcionários
-// const usuarioModel = require('../models/usuarioModel');
-// const empresaModel = require('../models/empresaModel');
-// const vinculoModel = require('../models/vinculoModel');
-// const { exigeLogin } = require('../middlewares/autenticacao');
-// const { HttpError } = require('../utils/erros');
-// const { criado } = require('../utils/resposta');
-// const { texto, emailValido, normalizarCodigo, validarSenha } = require('../utils/validacao');
-// const { usuarioPublico, planoDoUsuario } = require('../utils/apresentacao');
-// const senhaUtil = require('../utils/senha');
-// const { assinar } = require('../utils/token');
-
-// const respostaLogin = (u) => ({ token: assinar(u.id), usuario: usuarioPublico(u) });
-
-// function validarCadastro({ nome, email, senha }) {
-//   if (nome.length < 2) throw new HttpError(400, 'Informe seu nome.');
-//   if (!emailValido(email)) throw new HttpError(400, 'E-mail inválido.');
-//   const problemaSenha = validarSenha(senha);
-//   if (problemaSenha) throw new HttpError(400, problemaSenha);
-// }
-
-// function registrarAdmin({ body }) {
-//   const dados = { nome: texto(body.nome, 80), email: texto(body.email, 120).toLowerCase(), senha: String(body.senha || '') };
-//   validarCadastro(dados);
-
-//   if (usuarioModel.buscarAdminPorEmail(dados.email)) {
-//     throw new HttpError(409, 'Já existe um administrador com este e-mail.');
-//   }
-//   const admin = usuarioModel.criar({
-//     nome: dados.nome, email: dados.email, senhaHash: senhaUtil.gerarHash(dados.senha), perfil: 'administrador',
-//   });
-//   return criado(respostaLogin(admin));
-// }
-
-// function loginAdmin({ body }) {
-//   const email = texto(body.email, 120).toLowerCase();
-//   const admin = usuarioModel.buscarAdminPorEmail(email);
-
-//   if (!admin || !senhaUtil.conferir(String(body.senha || ''), admin.senha_hash)) {
-//     throw new HttpError(401, 'E-mail ou senha incorretos.');
-//   }
-//   return respostaLogin(admin);
-// }
-
-// function registrarFuncionario({ body }) {
-//   const dados = { nome: texto(body.nome, 80), email: texto(body.email, 120).toLowerCase(), senha: String(body.senha || '') };
-//   validarCadastro(dados);
-
-//   const empresa = empresaModel.buscarPorCodigo(normalizarCodigo(body.codigo));
-//   if (!empresa) throw new HttpError(404, 'Código da empresa não encontrado. Confira com o seu administrador.');
-
-//   if (usuarioModel.listarFuncionariosPorEmail(dados.email).length) {
-//     throw new HttpError(409, 'Já existe uma conta com este e-mail. Entre nela e use "Entrar em outra empresa" para adicionar o código.');
-//   }
-//   const funcionario = usuarioModel.criar({
-//     nome: dados.nome, email: dados.email, senhaHash: senhaUtil.gerarHash(dados.senha), perfil: 'funcionario',
-//   });
-//   vinculoModel.criar(funcionario.id, empresa.id);
-//   return criado(respostaLogin(funcionario));
-// }
-
-// function loginFuncionario({ body }) {
-//   const email = texto(body.email, 120).toLowerCase();
-//   const senha = String(body.senha || '');
-
-//   const funcionario = usuarioModel.listarFuncionariosPorEmail(email).find((u) => senhaUtil.conferir(senha, u.senha_hash));
-//   if (!funcionario) throw new HttpError(401, 'E-mail ou senha incorretos.');
-//   return respostaLogin(funcionario);
-// }
-
-// // Quem sou eu? (usado pelo frontend ao abrir o site com um token salvo)
-// function me({ req }) {
-//   const usuario = exigeLogin(req);
-
-//   if (usuario.perfil === 'administrador') {
-//     return {
-//       usuario: usuarioPublico(usuario),
-//       plano: planoDoUsuario(usuario),
-//       empresas: empresaModel.listarDoAdmin(usuario.id).map(empresaModel.comSetores),
-//     };
-//   }
-//   return {
-//     usuario: usuarioPublico(usuario),
-//     empresas: empresaModel.listarDoFuncionario(usuario.id).map(empresaModel.comSetores),
-//   };
-// }
-
-// module.exports = { registrarAdmin, loginAdmin, registrarFuncionario, loginFuncionario, me };
-
-// Cadastro e login de administradores e funcionários
-const bd = require('../config/database');
 const usuarioModel = require('../models/usuarioModel');
 const empresaModel = require('../models/empresaModel');
-const vinculoModel = require('../models/vinculoModel');
+const codigoModel = require('../models/codigoModel');
+const { duplicado } = require('../config/prisma');
 const { exigeLogin } = require('../middlewares/autenticacao');
+const codigoEmail = require('../services/codigoEmail');
 const { HttpError } = require('../utils/erros');
 const { criado } = require('../utils/resposta');
-const { texto, emailValido, normalizarCodigo, validarSenha } = require('../utils/validacao');
+const { texto, emailValido, nomeDePessoaValido, validarSenha } = require('../utils/validacao');
 const { usuarioPublico, planoDoUsuario } = require('../utils/apresentacao');
 const senhaUtil = require('../utils/senha');
 const { assinar } = require('../utils/token');
+const { SEM_CODIGO_EMAIL } = require('../config/env');
 
-const respostaLogin = (u) => ({ token: assinar(u.id), usuario: usuarioPublico(u) });
+const respostaLogin = (u) => ({ token: assinar(u), usuario: usuarioPublico(u) });
 
 function validarCadastro({ nome, email, senha }) {
   if (nome.length < 2) throw new HttpError(400, 'Informe seu nome.');
+  if (!nomeDePessoaValido(nome)) throw new HttpError(400, 'O nome só pode ter letras e espaços.');
   if (!emailValido(email)) throw new HttpError(400, 'E-mail inválido.');
   const problemaSenha = validarSenha(senha);
   if (problemaSenha) throw new HttpError(400, problemaSenha);
 }
 
-async function registrarAdmin({ body }) {
+function codigoInformado(valor) {
+  const codigo = String(valor || '').trim();
+  if (!/^\d{6}$/.test(codigo)) throw new HttpError(400, 'Informe o código de 6 dígitos.');
+  return codigo;
+}
+
+async function criarAdminDireto(dados) {
+  const jaExiste = () => new HttpError(409, 'Já existe uma conta com este e-mail.');
+  try {
+    const admin = await usuarioModel.criar({
+      nome: dados.nome,
+      email: dados.email,
+      senhaHash: senhaUtil.gerarHash(dados.senha),
+      perfil: 'administrador',
+    });
+    return respostaLogin(admin);
+  } catch (erro) {
+    throw duplicado(erro) ? jaExiste() : erro;
+  }
+}
+
+async function solicitarCadastro({ body }) {
   const dados = { nome: texto(body.nome, 80), email: texto(body.email, 120).toLowerCase(), senha: String(body.senha || '') };
   validarCadastro(dados);
+  if (await usuarioModel.buscarPorEmail(dados.email)) throw new HttpError(409, 'Já existe uma conta com este e-mail.');
+  if (SEM_CODIGO_EMAIL) return criarAdminDireto(dados);
+  return codigoEmail.emitir({
+    email: dados.email,
+    tipo: 'cadastro',
+    nome: dados.nome,
+    senhaHash: senhaUtil.gerarHash(dados.senha),
+  });
+}
 
-  const jaExiste = () => new HttpError(409, 'Já existe um administrador com este e-mail.');
-  if (await usuarioModel.buscarAdminPorEmail(dados.email)) throw jaExiste();
+async function registrarAdmin({ body }) {
+  const email = texto(body.email, 120).toLowerCase();
+  const codigo = codigoInformado(body.codigo);
+  if (!emailValido(email)) throw new HttpError(400, 'E-mail inválido.');
+
+  const jaExiste = () => new HttpError(409, 'Já existe uma conta com este e-mail.');
+  if (await usuarioModel.buscarPorEmail(email)) throw jaExiste();
+  const registro = await codigoEmail.conferir({ email, tipo: 'cadastro', codigo });
   let admin;
   try {
     admin = await usuarioModel.criar({
-      nome: dados.nome, email: dados.email, senhaHash: senhaUtil.gerarHash(dados.senha), perfil: 'administrador',
+      nome: registro.nome, email, senhaHash: registro.senhaHash, perfil: 'administrador',
     });
   } catch (erro) {
-    throw bd.duplicado(erro) ? jaExiste() : erro; // dois cadastros ao mesmo tempo
+    throw duplicado(erro) ? jaExiste() : erro;
   }
+  await codigoEmail.consumir(registro.id);
   return criado(respostaLogin(admin));
 }
 
-async function loginAdmin({ body }) {
+async function solicitarRecuperacao({ body }) {
   const email = texto(body.email, 120).toLowerCase();
-  const admin = await usuarioModel.buscarAdminPorEmail(email);
-
-  if (!admin || !senhaUtil.conferir(String(body.senha || ''), admin.senha_hash)) {
-    throw new HttpError(401, 'E-mail ou senha incorretos.');
-  }
-  return respostaLogin(admin);
+  if (!emailValido(email)) throw new HttpError(400, 'E-mail inválido.');
+  const usuario = await usuarioModel.buscarPorEmail(email);
+  if (!usuario) throw new HttpError(404, 'Não encontramos uma conta com este e-mail.');
+  return codigoEmail.emitir({ email, tipo: 'recuperacao', nome: usuario.nome });
 }
 
-async function registrarFuncionario({ body }) {
-  const dados = { nome: texto(body.nome, 80), email: texto(body.email, 120).toLowerCase(), senha: String(body.senha || '') };
-  validarCadastro(dados);
-
-  const empresa = await empresaModel.buscarPorCodigo(normalizarCodigo(body.codigo));
-  if (!empresa) throw new HttpError(404, 'Código da empresa não encontrado. Confira com o seu administrador.');
-
-  const jaExiste = () => new HttpError(409, 'Já existe uma conta com este e-mail. Entre nela e use "Entrar em outra empresa" para adicionar o código.');
-  if ((await usuarioModel.listarFuncionariosPorEmail(dados.email)).length) throw jaExiste();
-  let funcionario;
-  try {
-    funcionario = await usuarioModel.criar({
-      nome: dados.nome, email: dados.email, senhaHash: senhaUtil.gerarHash(dados.senha), perfil: 'funcionario',
-    });
-  } catch (erro) {
-    throw bd.duplicado(erro) ? jaExiste() : erro; // dois cadastros ao mesmo tempo
-  }
-  await vinculoModel.criar(funcionario.id, empresa.id);
-  return criado(respostaLogin(funcionario));
-}
-
-async function loginFuncionario({ body }) {
+async function confirmarRecuperacao({ body }) {
   const email = texto(body.email, 120).toLowerCase();
   const senha = String(body.senha || '');
+  if (!emailValido(email)) throw new HttpError(400, 'E-mail inválido.');
+  const problema = validarSenha(senha);
+  if (problema) throw new HttpError(400, problema);
 
-  const funcionario = (await usuarioModel.listarFuncionariosPorEmail(email)).find((u) => senhaUtil.conferir(senha, u.senha_hash));
-  if (!funcionario) throw new HttpError(401, 'E-mail ou senha incorretos.');
-  return respostaLogin(funcionario);
+  const usuario = await usuarioModel.buscarPorEmail(email);
+  if (!usuario) throw new HttpError(404, 'Não encontramos uma conta com este e-mail.');
+  if (senhaUtil.conferir(senha, usuario.senha_hash)) {
+    throw new HttpError(400, 'Escolha uma senha diferente da atual.');
+  }
+
+  if (!SEM_CODIGO_EMAIL) {
+    const codigo = codigoInformado(body.codigo);
+    const registro = await codigoEmail.conferir({ email, tipo: 'recuperacao', codigo });
+    await usuarioModel.definirSenha(usuario.id, senhaUtil.gerarHash(senha));
+    await codigoEmail.consumir(registro.id);
+  } else {
+    await usuarioModel.definirSenha(usuario.id, senhaUtil.gerarHash(senha));
+  }
+  return respostaLogin(await usuarioModel.buscarPorId(usuario.id));
 }
 
-// Quem sou eu? (usado pelo frontend ao abrir o site com um token salvo)
+async function reenviarCodigo({ body }) {
+  if (SEM_CODIGO_EMAIL) throw new HttpError(400, 'A confirmação por e-mail está desligada.');
+  const email = texto(body.email, 120).toLowerCase();
+  if (body.tipo !== 'cadastro' && body.tipo !== 'recuperacao') throw new HttpError(400, 'Pedido inválido.');
+  const tipo = body.tipo;
+  if (tipo === 'recuperacao') return solicitarRecuperacao({ body: { email } });
+
+  if (await usuarioModel.buscarPorEmail(email)) throw new HttpError(409, 'Já existe uma conta com este e-mail.');
+  const ultimo = await codigoModel.buscarUltimo(email, 'cadastro');
+  if (!ultimo?.senhaHash) throw new HttpError(400, 'Comece o cadastro de novo.');
+  return codigoEmail.emitir({ email, tipo: 'cadastro', nome: ultimo.nome, senhaHash: ultimo.senhaHash });
+}
+
+async function login({ body }) {
+  const email = texto(body.email, 120).toLowerCase();
+  const senha = String(body.senha || '');
+  const usuario = await usuarioModel.buscarPorEmail(email);
+
+  if (!usuario || !senhaUtil.conferir(senha, usuario.senha_hash)) {
+    throw new HttpError(401, 'E-mail ou senha incorretos.');
+  }
+  return respostaLogin(usuario);
+}
+
+async function definirSenha({ req, body }) {
+  const usuario = await exigeLogin(req, ['funcionario', 'tecnico']);
+  if (!usuario.trocar_senha) throw new HttpError(400, 'Sua senha já foi definida. Entre com ela.');
+
+  const senha = String(body.senha || '');
+  const problema = validarSenha(senha);
+  if (problema) throw new HttpError(400, problema);
+  if (senhaUtil.conferir(senha, usuario.senha_hash)) {
+    throw new HttpError(400, 'Escolha uma senha diferente da temporária.');
+  }
+
+  await usuarioModel.definirSenha(usuario.id, senhaUtil.gerarHash(senha));
+  return { ok: true };
+}
+
 async function me({ req }) {
   const usuario = await exigeLogin(req);
 
   if (usuario.perfil === 'administrador') {
+    const empresas = await empresaModel.listarDoAdmin(usuario.id);
     return {
       usuario: usuarioPublico(usuario),
       plano: planoDoUsuario(usuario),
-      empresas: await Promise.all((await empresaModel.listarDoAdmin(usuario.id)).map((e) => empresaModel.comSetores(e))),
+      empresas: await Promise.all(empresas.map((e) => empresaModel.comSetores(e))),
     };
   }
+  const empresas = await empresaModel.listarDoFuncionario(usuario.id);
   return {
     usuario: usuarioPublico(usuario),
-    empresas: await Promise.all((await empresaModel.listarDoFuncionario(usuario.id)).map((e) => empresaModel.comSetores(e))),
+    empresas: await Promise.all(empresas.map((e) => empresaModel.comSetores(e))),
   };
 }
 
-module.exports = { registrarAdmin, loginAdmin, registrarFuncionario, loginFuncionario, me };
+module.exports = {
+  solicitarCadastro, registrarAdmin, solicitarRecuperacao, confirmarRecuperacao, reenviarCodigo, login, definirSenha, me,
+};

@@ -1,4 +1,3 @@
-// Comunicação com o backend (todas as chamadas passam por aqui)
 import { estado } from './estado.js';
 
 export async function api(caminho, { method = 'GET', body } = {}) {
@@ -12,10 +11,9 @@ export async function api(caminho, { method = 'GET', body } = {}) {
   });
 
   let dados = null;
-  try { dados = await resposta.json(); } catch { /* resposta sem corpo */ }
+  try { dados = await resposta.json(); } catch {  }
 
   if (!resposta.ok) {
-    // token vencido ou inválido: o main.js escuta esse evento e leva para o login
     if (resposta.status === 401 && estado.token) window.dispatchEvent(new Event('sessao-expirada'));
     throw new Error(dados?.erro || 'Algo deu errado. Tente novamente.');
   }

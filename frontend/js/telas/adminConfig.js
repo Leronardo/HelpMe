@@ -1,57 +1,47 @@
-// Aba "Configurar empresa": nome, logotipo e setores
 import { api } from '../api.js';
 import { estado } from '../estado.js';
 import { rotear } from '../navegacao.js';
 import { empresaAtual } from '../sessao.js';
-import { $, $$, esc, toast, lerLogo } from '../utils.js';
+import { ligarLogo } from '../logoEscolha.js';
+import { $, $$, esc, toast } from '../utils.js';
+import { bloco, cabecalho, campoHtml, classesBotao, erroCls, htmlLogo, htmlLogosProntos, inputCls, logoImg, muted } from '../ui.js';
 
 export function viewConfig() {
   const empresa = empresaAtual();
-  estado.logoTemp = null; // só envia o logotipo se a pessoa escolher outro
+  estado.logoTemp = null;
 
   $('#main').innerHTML = `
-    <header class="page-h"><h1>Configurar empresa</h1><p class="muted">${esc(empresa.nome)}</p></header>
+    ${cabecalho('Configurar empresa', esc(empresa.nome))}
 
-    <section class="bloco">
-      <h2>Dados da empresa</h2>
+    <section class="${bloco}">
+      <h2 class="mb-3.5 text-[22px]">Dados da empresa</h2>
       <form id="fEmp" novalidate>
-        <label class="campo"><span>Nome da empresa</span>
-          <input type="text" name="nome" maxlength="80" value="${esc(empresa.nome)}" required></label>
-        <label class="logo-up">
-          <img id="prev" src="${esc(empresa.logo)}" alt="Logotipo atual">
-          <span><strong>Logotipo</strong><span class="muted" id="logoTxt">Clique para trocar a imagem</span></span>
-          <input type="file" id="logo" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml">
-        </label>
-        <p class="erro" id="erroEmp" role="alert"></p>
-        <button class="btn" id="salvar">Salvar alterações</button>
+        ${campoHtml('nome', 'Nome da empresa', 'text', `maxlength="80" value="${esc(empresa.nome)}"`)}
+        ${htmlLogo({
+          preview: `<img class="${logoImg}" id="prev" src="${esc(empresa.logo)}" alt="Logotipo atual">`,
+          textoId: 'logoTxt',
+          texto: 'Anexe outra imagem ou escolha uma opção abaixo',
+        })}
+        ${htmlLogosProntos(empresa.logo)}
+        <p class="${erroCls}" id="erroEmp" role="alert"></p>
+        <button class="${classesBotao()}" id="salvar">Salvar alterações</button>
       </form>
     </section>
 
-    <section class="bloco">
-      <h2>Setores</h2>
-      <p class="muted">Os funcionários escolhem um destes setores ao abrir um chamado. Se você remover um setor, os chamados antigos continuam com o nome dele.</p>
-      <ul class="chips" id="setores"></ul>
-      <form id="fSet" class="linha-add" novalidate>
-        <input type="text" name="nome" maxlength="40" placeholder="Novo setor (ex.: Logística)" aria-label="Nome do novo setor">
-        <button class="btn">Adicionar</button>
+    <section class="${bloco}">
+      <h2 class="mb-3.5 text-[22px]">Setores</h2>
+      <p class="-mt-1.5 mb-3.5 ${muted}">Os colaboradores escolhem um destes setores ao abrir um chamado. Se você remover um setor, os chamados antigos continuam com o nome dele.</p>
+      <ul class="mb-3.5 flex list-none flex-wrap gap-2 p-0" id="setores"></ul>
+      <form id="fSet" class="flex flex-col gap-2.5 min-[521px]:flex-row" novalidate>
+        <input class="${inputCls}" type="text" name="nome" maxlength="40" placeholder="Novo setor (ex.: Logística)" aria-label="Nome do novo setor">
+        <button class="${classesBotao()} shrink-0">Adicionar</button>
       </form>
-      <p class="erro" id="erroSet" role="alert"></p>
+      <p class="${erroCls} mt-2.5" id="erroSet" role="alert"></p>
     </section>`;
 
   desenharSetores();
 
-  $('#logo').addEventListener('change', async (evento) => {
-    const arquivo = evento.target.files[0];
-    if (!arquivo) return;
-    try {
-      estado.logoTemp = await lerLogo(arquivo);
-      $('#prev').src = estado.logoTemp;
-      $('#logoTxt').textContent = arquivo.name;
-      $('#erroEmp').textContent = '';
-    } catch (e) {
-      $('#erroEmp').textContent = e.message;
-    }
-  });
+  ligarLogo((src) => { estado.logoTemp = src; }, '#erroEmp');
 
   $('#fEmp').addEventListener('submit', salvarEmpresa);
   $('#fSet').addEventListener('submit', adicionarSetor);
@@ -70,7 +60,7 @@ async function salvarEmpresa(evento) {
     const dados = await api(`/empresas/${empresa.id}`, { method: 'PUT', body: { nome, logo: estado.logoTemp || undefined } });
     estado.empresas = estado.empresas.map((e) => (e.id === empresa.id ? dados.empresa : e));
     toast('Empresa atualizada!');
-    rotear(); // redesenha o menu lateral com o novo nome e logotipo
+    rotear();
   } catch (e) {
     erro.textContent = e.message;
     botao.disabled = false;
@@ -80,13 +70,12 @@ async function salvarEmpresa(evento) {
 function desenharSetores() {
   const { setores } = empresaAtual();
   $('#setores').innerHTML = setores.map((s) => `
-    <li class="chip">${esc(s.nome)}
-      <button type="button" data-id="${s.id}" aria-label="Remover setor ${esc(s.nome)}">×</button></li>`).join('');
+    <li class="inline-flex items-center gap-1.5 rounded-full bg-[#E8EDF2] py-1 pr-1.5 pl-3.5 font-semibold">${esc(s.nome)}
+      <button type="button" class="grid size-6 cursor-pointer place-items-center rounded-full border-0 bg-[#CBD4DD] p-0 text-base leading-none hover:bg-danger hover:text-white" data-id="${s.id}" aria-label="Remover setor ${esc(s.nome)}">×</button></li>`).join('');
 
   $$('#setores button').forEach((botao) => botao.addEventListener('click', () => removerSetor(botao.dataset.id)));
 }
 
-// Atualiza a lista de setores da empresa na memória e na tela
 function aplicarSetores(setores) {
   empresaAtual().setores = setores;
   desenharSetores();
